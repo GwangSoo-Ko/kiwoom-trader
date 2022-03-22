@@ -1,7 +1,6 @@
-import sys
-
 from PyQt5.QtWidgets import *
 
+import analysis.checkBuyList
 from kiwoom.kiwoom import *
 
 
@@ -13,4 +12,5 @@ class Main:
 
 
 if __name__ == "__main__":
-    Main()
+    # Main()
+    analysis.checkBuyList.check_buy_list()
