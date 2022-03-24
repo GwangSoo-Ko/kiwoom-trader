@@ -119,15 +119,23 @@ def check_buy_list():
 
     # 매수 모듈
 
-    # 수정된 점: PB 0이상 (Bollinger Band안벗어나게)
-    Module_A_pre = df_1[(df_1["PB"] > 0.00) & (df_1["PB"] < 0.05) & (df_1["IIP21"] > 0)]
-    idx_spec_a = Module_A_pre[Module_A_pre["Name"].str.contains("스팩", regex=False) == True].index
-    Module_A = Module_A_pre.drop(idx_spec_a)
+    # Module A
+    ## Bollinger Band: 0% < x < 5%
+    ## II > 0
+    ## Volume 1000000
+    ## Name: 스팩 제거
 
-    # 수정된 점: MFI 90미만 설정
-    Module_B_pre = df_1[(df_1["PB"] > 0.80) & (df_1["PB"] < 0.85) & (df_1["MFI10"] > 80) & (df_1["MFI10"] < 90)]
-    idx_spec_b = Module_B_pre[Module_B_pre["Name"].str.contains("스팩", regex=False) == True].index
-    Module_B = Module_B_pre.drop(idx_spec_b)
+    Module_A = df_1[(df_1["PB"] > 0.00) & (df_1["PB"] < 0.05) & (df_1["IIP21"] > 0) & (df_1["Volume"] > 1000000) & (
+                df_1['Name'] != df_1['Name'].str.contains("스팩"))]
+
+    # Module B
+    ## Bollinger Band: 80% < x < 90%
+    ## MFI: 80 < x < 90
+    ## Volume 1000000
+    ## Name: 스팩 제거
+
+    Module_B = df_1[(df_1["PB"] > 0.80) & (df_1["PB"] < .85) & (df_1["MFI10"] > 80) & (df_1["MFI10"] < 90) & (
+                df_1["Volume"] > 1000000) & (df_1['Name'] != df_1['Name'].str.contains('^스팩^'))]
 
     Module_A.to_csv('files/Module_A_' + today.strftime("%Y%m%d") + '.csv',
                     index=False)  ## 구분자를 탭으로 하여 저장. 인덱스칼럼은 저장 안함.
