@@ -26,7 +26,7 @@ def get_stock(company_code_name_df, company_code, start_year):
 def check_buy_list():
     # 날짜지정
     yesterday = datetime.today() - timedelta(1)
-    today = datetime.today()
+    today = datetime.today() - timedelta(1)
 
     # 한국거래소 상장종목 전체
     df_krx = fdr.StockListing('KRX')

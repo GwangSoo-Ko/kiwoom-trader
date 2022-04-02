@@ -35,20 +35,20 @@ class Kiwoom(QAxWidget):
         ###########################
 
         ####### 계좌 관련된 변수
-        self.account_stock_dict = {}
-        self.not_account_stock_dict = {}
+        self.account_stock_dict = {}  # 현재 보유중인 종목
+        self.not_account_stock_dict = {}  # 미체결 종목
         self.account_num = None  # 계좌번호 담아줄 변수
         self.deposit = 0  # 예수금
         self.use_money = 0  # 실제 투자에 사용할 금액
-        self.use_money_percent = 0.5  # 예수금에서 실제 사용할 비율
+        self.use_money_percent = 0.1  # 예수금에서 실제 사용할 비율
         self.output_deposit = 0  # 출력가능 금액
         self.total_profit_loss_money = 0  # 총평가손익금액
         self.total_profit_loss_rate = 0.0  # 총수익률(%)
         ########################################
 
         ######## 종목 정보 가져오기
-        self.portfolio_stock_dict = {}
-        self.jango_dict = {}
+        self.portfolio_stock_dict = {}  # 전일 계산된 매수 종목 후보
+        self.jango_dict = {}  # 실시간 매수한 종목
         ########################
 
         ########### 종목 분석 용
@@ -79,6 +79,7 @@ class Kiwoom(QAxWidget):
         self.read_module_a()
         self.read_module_b()
         self.screen_number_setting()
+        self.candidate_count = len(self.portfolio_stock_dict)  # 매수 종목 개수
 
         message_string = []
         if len(self.account_stock_dict) == 0:
@@ -111,12 +112,13 @@ class Kiwoom(QAxWidget):
                 order_quantity = self.not_account_stock_dict[order_no]["주문수량"]
                 order_price = self.not_account_stock_dict[order_no]["주문가격"]
                 order_gubun = self.not_account_stock_dict[order_no]["주문구분"]
-                not_quantity = self.not_account_stock_dict[order_no]["미체결수량"]
-                ok_quantity = self.not_account_stock_dict[order_no]["체결량"]
+                not_quantity = int(self.not_account_stock_dict[order_no]["미체결수량"])
+                ok_quantity = int(self.not_account_stock_dict[order_no]["체결량"])
+                print(ok_quantity)
                 message_string.append(
                     "종목명: %s\n주문번호: %d\n주문상태: %s\n주문수량: %d\n주문가격: %d\n주문구분: %s\n미체결수량: %d\n체결량: %d" % (
-                    code_name, order_no, order_status, order_quantity, order_price, order_gubun, not_quantity,
-                    ok_quantity))
+                        code_name, order_no, order_status, order_quantity, order_price, order_gubun, not_quantity,
+                        ok_quantity))
                 message_string.append("-------------------------------------")
         self.myMsg.send_msg_telegram('\n'.join(message_string))
 
@@ -126,11 +128,14 @@ class Kiwoom(QAxWidget):
         else:
             message_string.append("[매수 후보 종목 리스트]")
             for code in self.portfolio_stock_dict.keys():
-                code_name = self.portfolio_stock_dict[code]["종목명"]
-                stock_price = self.portfolio_stock_dict[code]["현재가"]
-                logic = self.portfolio_stock_dict[code]["Logic"]
-                message_string.append("종목명: %s\n최근가격: %d\n로직: %s" % (code_name, stock_price, logic))
-                message_string.append("-------------------------------------")
+                try:
+                    code_name = self.portfolio_stock_dict[code]["종목명"]
+                    stock_price = self.portfolio_stock_dict[code]["현재가"]
+                    logic = self.portfolio_stock_dict[code]["Logic"]
+                    message_string.append("종목명: %s\n최근가격: %d\n로직: %s" % (code_name, stock_price, logic))
+                    message_string.append("-------------------------------------")
+                except KeyError as e:
+                    continue
         self.myMsg.send_msg_telegram('\n'.join(message_string))
 
         QTest.qWait(5000)
@@ -176,6 +181,7 @@ class Kiwoom(QAxWidget):
         self.account_num = account_num
 
         self.logging.logger.debug("계좌번호 : %s" % account_num)
+        self.myMsg.send_msg_telegram("계좌번호 : %s" % account_num)
 
     def detail_account_info(self, sPrevNext="0"):
         self.dynamicCall("SetInputValue(QString, QString)", "계좌번호", self.account_num)
@@ -215,13 +221,14 @@ class Kiwoom(QAxWidget):
 
             use_money = float(self.deposit) * self.use_money_percent
             self.use_money = int(use_money)
-            self.use_money = self.use_money / 4
+            # self.use_money = self.use_money / 4
 
             output_deposit = self.dynamicCall("GetCommData(QString, QString, int, QString)", sTrCode, sRQName, 0,
                                               "출금가능금액")
             self.output_deposit = int(output_deposit)
 
             self.logging.logger.debug("예수금 : %s" % self.output_deposit)
+            self.myMsg.send_msg_telegram("예수금 : %s" % self.output_deposit)
 
             self.stop_screen_cancel(self.screen_my_info)
 
@@ -497,7 +504,7 @@ class Kiwoom(QAxWidget):
         self.calculator_event_loop.exec_()
 
     def read_module_a(self):
-        yesterday = (datetime.today() - timedelta(2)).strftime("%Y%m%d")
+        yesterday = (datetime.datetime.today() - timedelta(1)).strftime("%Y%m%d")
 
         if os.path.exists("files/Module_A_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
             f = open("files/Module_A_" + yesterday + ".csv", "r", encoding="utf8")
@@ -515,7 +522,7 @@ class Kiwoom(QAxWidget):
             f.close()
 
     def read_module_b(self):
-        yesterday = (datetime.today() - timedelta(2)).strftime("%Y%m%d")
+        yesterday = (datetime.datetime.today() - timedelta(1)).strftime("%Y%m%d")
 
         if os.path.exists("files/Module_B_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
             f = open("files/Module_B_" + yesterday + ".csv", "r", encoding="utf8")
@@ -527,7 +534,6 @@ class Kiwoom(QAxWidget):
                     stock_name = line[7]
                     stock_price = int(line[4])
                     stock_price = abs(stock_price)
-
                     self.portfolio_stock_dict.update(
                         {stock_code: {"종목명": stock_name, "현재가": stock_price, "Logic": "B"}})
             f.close()
@@ -590,25 +596,33 @@ class Kiwoom(QAxWidget):
 
             if value == '0':
                 self.logging.logger.debug("장 시작 전")
+                # self.myMsg.send_msg_telegram("장 시작 전")
 
             elif value == '3':
                 self.logging.logger.debug("장 시작")
+                self.myMsg.send_msg_telegram("장 시작")
 
             elif value == "2":
                 self.logging.logger.debug("장 종료, 동시호가로 넘어감")
+                self.myMsg.send_msg_telegram("장 종료, 동시호가로 넘어감")
 
             elif value == "4":
                 self.logging.logger.debug("3시30분 장 종료")
+                self.myMsg.send_msg_telegram("3시30분 장 종료")
 
                 for code in self.portfolio_stock_dict.keys():
                     self.dynamicCall("SetRealRemove(QString, QString)", self.portfolio_stock_dict[code]['스크린번호'], code)
 
                 QTest.qWait(3600000)  # 1시간 대기 후
 
+                self.logging.logger.debug("매수 후보 추출 프로세스 시작")
+                self.myMsg.send_msg_telegram("매수 후보 추출 프로세스 시작")
                 # self.file_delete()
                 # self.calculator_fnc()
                 analysis.checkBuyList.check_buy_list()
 
+                self.logging.logger.debug("매수 후보 추출 프로세스 완료")
+                self.myMsg.send_msg_telegram("매수 후보 추출 프로세스 완료")
                 sys.exit()
 
 
@@ -668,10 +682,12 @@ class Kiwoom(QAxWidget):
             self.portfolio_stock_dict[sCode].update({"저가": k})
 
             if sCode in self.account_stock_dict.keys() and sCode not in self.jango_dict.keys():
+                QTest.qWait(3600)
+
                 asd = self.account_stock_dict[sCode]
                 meme_rate = (b - asd['매입가']) / asd['매입가'] * 100
 
-                if asd['매매가능수량'] > 0 and (meme_rate > 15 or meme_rate < -5):
+                if asd['매매가능수량'] > 0 and (meme_rate > 5 or meme_rate < -2):
                     order_success = self.dynamicCall(
                         "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
                         ["신규매도", self.portfolio_stock_dict[sCode]["주문용스크린번호"], self.account_num, 2, sCode,
@@ -679,16 +695,20 @@ class Kiwoom(QAxWidget):
                     )
 
                     if order_success == 0:
-                        self.logging.logger.debug("매도주문 전달 성공")
+                        self.logging.logger.debug("매도주문 전달 성공 > %s" % self.account_stock_dict[sCode]["종목명"])
+                        self.myMsg.send_msg_telegram("매도주문 전달 성공 > %s" % self.account_stock_dict[sCode]["종목명"])
                         del self.account_stock_dict[sCode]
                     else:
-                        self.logging.logger.debug("매도주문 전달 실패")
+                        self.logging.logger.debug("매도주문 전달 실패 > %s" % self.account_stock_dict[sCode]["종목명"])
+                        self.myMsg.send_msg_telegram("매도주문 전달 실패 > %s" % self.account_stock_dict[sCode]["종목명"])
 
             elif sCode in self.jango_dict.keys():
+                QTest.qWait(3600)
+
                 jd = self.jango_dict[sCode]
                 meme_rate = (b - jd['매입단가']) / jd['매입단가'] * 100
 
-                if jd['주문가능수량'] > 0 and (meme_rate > 15 or meme_rate < -5):
+                if jd['주문가능수량'] > 0 and (meme_rate > 5 or meme_rate < -2):
                     order_success = self.dynamicCall(
                         "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
                         ["신규매도", self.portfolio_stock_dict[sCode]["주문용스크린번호"], self.account_num, 2, sCode, jd['주문가능수량'],
@@ -696,14 +716,20 @@ class Kiwoom(QAxWidget):
                     )
 
                     if order_success == 0:
-                        self.logging.logger.debug("매도주문 전달 성공")
+                        self.logging.logger.debug("매도주문 전달 성공 > %s" % self.jango_dict[sCode]["종목명"])
+                        self.myMsg.send_msg_telegram("매도주문 전달 성공 > %s" % self.jango_dict[sCode]["종목명"])
                     else:
-                        self.logging.logger.debug("매도주문 전달 실패")
+                        self.logging.logger.debug("매도주문 전달 실패 > %s" % self.jango_dict[sCode]["종목명"])
+                        self.myMsg.send_msg_telegram("매도주문 전달 실패 > %s" % self.jango_dict[sCode]["종목명"])
 
             elif d > 1.0 and sCode not in self.jango_dict:
-                self.logging.logger.debug("매수조건 통과 %s " % sCode)
+                QTest.qWait(3600)
 
-                result = (self.use_money * 0.1) / e
+                self.logging.logger.debug("매수조건 통과 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
+                self.myMsg.send_msg_telegram("매수조건 통과 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
+
+                result = (self.use_money * (
+                        1 / self.candidate_count)) / e  # 매수 금액 예산을 매수 종목 후보 개수로 나눠 종목당 매수 금액을 구하고, 이것을 종목당 최우선 매도호가로 나누어 매수량을 정한다.
                 quantity = int(result)
 
                 order_success = self.dynamicCall(
@@ -713,12 +739,16 @@ class Kiwoom(QAxWidget):
                 )
 
                 if order_success == 0:
-                    self.logging.logger.debug("매수주문 전달 성공")
+                    self.logging.logger.debug("매수주문 전달 성공 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
+                    self.myMsg.send_msg_telegram("매수주문 전달 성공 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
                 else:
-                    self.logging.logger.debug("매수주문 전달 실패")
+                    self.logging.logger.debug("매수주문 전달 실패 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
+                    self.myMsg.send_msg_telegram("매수주문 전달 실패 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
 
             not_meme_list = list(self.not_account_stock_dict)
             for order_num in not_meme_list:
+                QTest.qWait(3600)
+
                 code = self.not_account_stock_dict[order_num]["종목코드"]
                 meme_price = self.not_account_stock_dict[order_num]['주문가격']
                 not_quantity = self.not_account_stock_dict[order_num]['미체결수량']
@@ -732,9 +762,11 @@ class Kiwoom(QAxWidget):
                     )
 
                     if order_success == 0:
-                        self.logging.logger.debug("매수취소 전달 성공")
+                        self.logging.logger.debug("매수취소 전달 성공 > %s" % self.not_account_stock_dict[order_num]["종목명"])
+                        self.myMsg.send_msg_telegram("매수취소 전달 성공 > %s" % self.not_account_stock_dict[order_num]["종목명"])
                     else:
-                        self.logging.logger.debug("매수취소 전달 실패")
+                        self.logging.logger.debug("매수취소 전달 실패 > %s" % self.not_account_stock_dict[order_num]["종목명"])
+                        self.myMsg.send_msg_telegram("매수취소 전달 실패 > %s" % self.not_account_stock_dict[order_num]["종목명"])
 
                 elif not_quantity == 0:
                     del self.not_account_stock_dict[order_num]
@@ -862,6 +894,7 @@ class Kiwoom(QAxWidget):
 
     def msg_slot(self, sScrNo, sRQName, sTrCode, msg):
         self.logging.logger.debug("스크린: %s, 요청이름: %s, tr코드: %s --- %s" % (sScrNo, sRQName, sTrCode, msg))
+        self.myMsg.send_msg_telegram("스크린: %s, 요청이름: %s, tr코드: %s --- %s" % (sScrNo, sRQName, sTrCode, msg))
 
     def file_delete(self):
         if os.path.isfile("files/condition_stock.txt"):
