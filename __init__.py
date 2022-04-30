@@ -11,5 +11,5 @@ class Main:
 
 
 if __name__ == "__main__":
-    Main()
-    # analysis.checkBuyList.check_buy_list()
+    # Main()
+    analysis.checkBuySellList.check_buy_sell_list()

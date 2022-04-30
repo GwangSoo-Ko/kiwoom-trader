@@ -3,11 +3,12 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+import pandas as pd
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
 from PyQt5.QtTest import *
 
-import analysis.checkBuyList
+import analysis.checkBuySellList
 from config.errorCode import *
 from config.kiwoomType import *
 from config.log_class import *
@@ -51,6 +52,10 @@ class Kiwoom(QAxWidget):
         self.jango_dict = {}  # 실시간 매수한 종목
         ########################
 
+        #### 주문 종목 처리
+        self.buy_order_list = []
+        self.sell_order_list = []
+
         ########### 종목 분석 용
         self.calcul_data = []
         ##########################################
@@ -78,6 +83,7 @@ class Kiwoom(QAxWidget):
         QTest.qWait(10000)
         self.read_module_a()
         self.read_module_b()
+        self.read_module_c()
         self.screen_number_setting()
         self.candidate_count = len(self.portfolio_stock_dict)  # 매수 종목 개수
 
@@ -116,7 +122,7 @@ class Kiwoom(QAxWidget):
                 ok_quantity = int(self.not_account_stock_dict[order_no]["체결량"])
                 print(ok_quantity)
                 message_string.append(
-                    "종목명: %s\n주문번호: %d\n주문상태: %s\n주문수량: %d\n주문가격: %d\n주문구분: %s\n미체결수량: %d\n체결량: %d" % (
+                    "종목명: %s\n주문번호: %d\n주문상태: %s\n주문수량: %d\n주문가격: %d\n주문구분: %s\wn미체결수량: %d\n체결량: %d" % (
                         code_name, order_no, order_status, order_quantity, order_price, order_gubun, not_quantity,
                         ok_quantity))
                 message_string.append("-------------------------------------")
@@ -150,6 +156,9 @@ class Kiwoom(QAxWidget):
             self.dynamicCall("SetRealReg(QString, QString, QString, QString)", screen_num, code, fids, "1")
 
         self.myMsg.send_msg_telegram(msg="주식 자동화 프로그램 동작")
+
+        self.after_market()
+        # QTimer.singleShot(5000, self.after_market)
 
     def get_ocx_instance(self):
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")  # 레지스트리에 저장된 API 모듈 불러오기
@@ -351,7 +360,6 @@ class Kiwoom(QAxWidget):
 
             self.detail_account_info_event_loop.exit()
 
-
     def stop_screen_cancel(self, sScrNo=None):
         self.dynamicCall("DisconnectRealData(QString)", sScrNo)  # 스크린 번호 연결 끊기
 
@@ -363,8 +371,8 @@ class Kiwoom(QAxWidget):
     def read_module_a(self):
         yesterday = (datetime.datetime.today() - timedelta(1)).strftime("%Y%m%d")
 
-        if os.path.exists("files/Module_A_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
-            f = open("files/Module_A_" + yesterday + ".csv", "r", encoding="utf8")
+        if os.path.exists("files/buy/Module_A_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
+            f = open("files/buy/Module_A_" + yesterday + ".csv", "r", encoding="utf8")
             csv_data = csv.reader(f)
             next(csv_data)  # csv header skip
             for line in csv_data:  # 줄바꿈된 내용들이 한줄 씩 읽어와진다.
@@ -374,14 +382,15 @@ class Kiwoom(QAxWidget):
                     stock_price = int(line[4])
                     stock_price = abs(stock_price)
                     if stock_code not in self.portfolio_stock_dict.keys():
-                        self.portfolio_stock_dict.update({stock_code: {"종목명": stock_name, "현재가": stock_price, "Logic": "A"}})
+                        self.portfolio_stock_dict.update(
+                            {stock_code: {"종목명": stock_name, "현재가": stock_price, "Logic": "A"}})
             f.close()
 
     def read_module_b(self):
         yesterday = (datetime.datetime.today() - timedelta(1)).strftime("%Y%m%d")
 
-        if os.path.exists("files/Module_B_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
-            f = open("files/Module_B_" + yesterday + ".csv", "r", encoding="utf8")
+        if os.path.exists("files/buy/Module_B_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
+            f = open("files/buy/Module_B_" + yesterday + ".csv", "r", encoding="utf8")
             csv_data = csv.reader(f)
             next(csv_data)  # csv header skip
             for line in csv_data:  # 줄바꿈된 내용들이 한줄 씩 읽어와진다.
@@ -391,7 +400,26 @@ class Kiwoom(QAxWidget):
                     stock_price = int(line[4])
                     stock_price = abs(stock_price)
                     if stock_code not in self.portfolio_stock_dict.keys():
-                        self.portfolio_stock_dict.update({stock_code: {"종목명": stock_name, "현재가": stock_price, "Logic": "B"}})
+                        self.portfolio_stock_dict.update(
+                            {stock_code: {"종목명": stock_name, "현재가": stock_price, "Logic": "B"}})
+            f.close()
+
+    def read_module_c(self):
+        yesterday = (datetime.datetime.today() - timedelta(1)).strftime("%Y%m%d")
+
+        if os.path.exists("files/buy/Module_C_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
+            f = open("files/buy/Module_C_" + yesterday + ".csv", "r", encoding="utf8")
+            csv_data = csv.reader(f)
+            next(csv_data)  # csv header skip
+            for line in csv_data:  # 줄바꿈된 내용들이 한줄 씩 읽어와진다.
+                if line != "":
+                    stock_code = line[8]
+                    stock_name = line[7]
+                    stock_price = int(line[4])
+                    stock_price = abs(stock_price)
+                    if stock_code not in self.portfolio_stock_dict.keys():
+                        self.portfolio_stock_dict.update(
+                            {stock_code: {"종목명": stock_name, "현재가": stock_price, "Logic": "C"}})
             f.close()
 
     def merge_dict(self):
@@ -466,20 +494,10 @@ class Kiwoom(QAxWidget):
                 self.logging.logger.debug("3시30분 장 종료")
                 self.myMsg.send_msg_telegram("3시30분 장 종료")
 
-                for code in self.portfolio_stock_dict.keys():
-                    self.dynamicCall("SetRealRemove(QString, QString)", self.portfolio_stock_dict[code]['스크린번호'], code)
+                QTimer.singleShot(5000, self.after_market)
+                QTimer.singleShot(5000, self.set_real_remove)
+                QTimer.singleShot(3600000, self.buy_list_process)
 
-                QTest.qWait(3600000)  # 1시간 대기 후
-
-                self.logging.logger.debug("매수 후보 추출 프로세스 시작")
-                self.myMsg.send_msg_telegram("매수 후보 추출 프로세스 시작")
-                # self.file_delete()
-                # self.calculator_fnc()
-                analysis.checkBuyList.check_buy_list()
-
-                self.logging.logger.debug("매수 후보 추출 프로세스 완료")
-                self.myMsg.send_msg_telegram("매수 후보 추출 프로세스 완료")
-                sys.exit()
 
 
         elif sRealType == "주식체결":
@@ -537,12 +555,12 @@ class Kiwoom(QAxWidget):
             self.portfolio_stock_dict[sCode].update({"시가": j})
             self.portfolio_stock_dict[sCode].update({"저가": k})
 
-            if sCode in self.account_stock_dict.keys() and sCode not in self.jango_dict.keys():
+            if sCode in self.account_stock_dict.keys() and sCode not in self.jango_dict.keys() and sCode not in self.sell_order_list:
 
                 asd = self.account_stock_dict[sCode]
                 meme_rate = (b - asd['매입가']) / asd['매입가'] * 100
 
-                if asd['매매가능수량'] > 0 and (meme_rate > 5 or meme_rate < -2):
+                if asd['매매가능수량'] > 0 and (meme_rate > 10 or meme_rate < -5):
                     order_success = self.dynamicCall(
                         "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
                         ["신규매도", self.portfolio_stock_dict[sCode]["주문용스크린번호"], self.account_num, 2, sCode,
@@ -553,16 +571,17 @@ class Kiwoom(QAxWidget):
                         self.logging.logger.debug("매도주문 전달 성공 > %s" % self.account_stock_dict[sCode]["종목명"])
                         self.myMsg.send_msg_telegram("매도주문 전달 성공 > %s" % self.account_stock_dict[sCode]["종목명"])
                         del self.account_stock_dict[sCode]
+                        self.sell_order_list.append(sCode)
                     else:
                         self.logging.logger.debug("매도주문 전달 실패 > %s" % self.account_stock_dict[sCode]["종목명"])
                         self.myMsg.send_msg_telegram("매도주문 전달 실패 > %s" % self.account_stock_dict[sCode]["종목명"])
 
-            elif sCode in self.jango_dict.keys():
+            elif sCode in self.jango_dict.keys() and sCode not in self.sell_order_list:
 
                 jd = self.jango_dict[sCode]
                 meme_rate = (b - jd['매입단가']) / jd['매입단가'] * 100
 
-                if jd['주문가능수량'] > 0 and (meme_rate > 5 or meme_rate < -2):
+                if jd['주문가능수량'] > 0 and (meme_rate > 10 or meme_rate < -5):
                     order_success = self.dynamicCall(
                         "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
                         ["신규매도", self.portfolio_stock_dict[sCode]["주문용스크린번호"], self.account_num, 2, sCode, jd['주문가능수량'],
@@ -572,12 +591,12 @@ class Kiwoom(QAxWidget):
                     if order_success == 0:
                         self.logging.logger.debug("매도주문 전달 성공 > %s" % self.jango_dict[sCode]["종목명"])
                         self.myMsg.send_msg_telegram("매도주문 전달 성공 > %s" % self.jango_dict[sCode]["종목명"])
+                        self.sell_order_list.append(sCode)
                     else:
                         self.logging.logger.debug("매도주문 전달 실패 > %s" % self.jango_dict[sCode]["종목명"])
                         self.myMsg.send_msg_telegram("매도주문 전달 실패 > %s" % self.jango_dict[sCode]["종목명"])
 
-            elif d > 1.0 and sCode not in self.jango_dict:
-
+            elif d > 1.0 and sCode not in self.jango_dict and sCode not in self.buy_order_list:
                 self.logging.logger.debug("매수조건 통과 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
                 self.myMsg.send_msg_telegram("매수조건 통과 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
 
@@ -594,6 +613,7 @@ class Kiwoom(QAxWidget):
                 if order_success == 0:
                     self.logging.logger.debug("매수주문 전달 성공 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
                     self.myMsg.send_msg_telegram("매수주문 전달 성공 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
+                    self.buy_order_list.append(sCode)
                 else:
                     self.logging.logger.debug("매수주문 전달 실패 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
                     self.myMsg.send_msg_telegram("매수주문 전달 실패 > %s" % self.portfolio_stock_dict[sCode]["종목명"])
@@ -606,7 +626,8 @@ class Kiwoom(QAxWidget):
                 not_quantity = self.not_account_stock_dict[order_num]['미체결수량']
                 order_gubun = self.not_account_stock_dict[order_num]['주문구분']
 
-                if code == sCode and order_gubun == "매수" and not_quantity > 0 and (e-meme_price+1)/(meme_price+1) > 0.1 and meme_price != 0:
+                if code == sCode and order_gubun == "매수" and not_quantity > 0 and (e - meme_price + 1) / (
+                        meme_price + 1) > 0.1 and meme_price != 0:
                     order_success = self.dynamicCall(
                         "SendOrder(QString, QString, QString, int, QString, int, int, QString, QString)",
                         ["매수취소", self.portfolio_stock_dict[sCode]["주문용스크린번호"], self.account_num, 3, code, 0, 0,
@@ -748,3 +769,83 @@ class Kiwoom(QAxWidget):
         self.logging.logger.debug("스크린: %s, 요청이름: %s, tr코드: %s --- %s" % (sScrNo, sRQName, sTrCode, msg))
         self.myMsg.send_msg_telegram("스크린: %s, 요청이름: %s, tr코드: %s --- %s" % (sScrNo, sRQName, sTrCode, msg))
 
+    def set_real_remove(self):
+        for code in self.portfolio_stock_dict.keys():
+            self.dynamicCall("SetRealRemove(QString, QString)", self.portfolio_stock_dict[code]['스크린번호'], code)
+
+    def after_market(self):
+        self.account_stock_dict = {}
+        self.detail_account_mystock()
+        message_string = []
+        if len(self.account_stock_dict) == 0:
+            message_string.append("[보유 종목 없음]")
+        else:
+            message_string.append("[보유 종목 리스트]")
+            for code in self.account_stock_dict.keys():
+                code_name = self.account_stock_dict[code]["종목명"]
+                quantity = self.account_stock_dict[code]["보유수량"]
+                buy_price = self.account_stock_dict[code]["매입가"]
+                current_price = self.account_stock_dict[code]["현재가"]
+                profit_rate = self.account_stock_dict[code]["수익률(%)"]
+                total_buy_price = quantity * buy_price
+                total_current_price = quantity * current_price
+                profit = total_current_price - total_buy_price
+                message_string.append(
+                    "종목명: %s\n보유수량: %d\n매입가: %d\n현재가: %d\n수익률: %f\n매입금액: %d\n평가금액: %d\n수익: %d" % (
+                        code_name, quantity, buy_price, current_price, profit_rate, total_buy_price,
+                        total_current_price,
+                        profit))
+                message_string.append("-------------------------------------")
+        self.myMsg.send_msg_telegram('\n'.join(message_string))
+
+        current_holding_list = []
+        today = datetime.datetime.today()
+
+        for i in range(10):
+            yesterday = (today - timedelta(i)).strftime("%Y%m%d")
+            if os.path.exists("files/buy/Module_A_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
+                f = open("files/buy/Module_A_" + yesterday + ".csv", "r", encoding="utf8")
+                csv_data = csv.reader(f)
+                next(csv_data)  # csv header skip
+                for line in csv_data:  # 줄바꿈된 내용들이 한줄 씩 읽어와진다.
+                    if line != "":
+                        stock_code = line[8]
+                        if stock_code in self.account_stock_dict.keys():
+                            current_holding_list.append([stock_code, "A"])
+                f.close()
+
+            if os.path.exists("files/buy/Module_B_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
+                f = open("files/buy/Module_B_" + yesterday + ".csv", "r", encoding="utf8")
+                csv_data = csv.reader(f)
+                next(csv_data)  # csv header skip
+                for line in csv_data:  # 줄바꿈된 내용들이 한줄 씩 읽어와진다.
+                    if line != "":
+                        stock_code = line[8]
+                        if stock_code in self.account_stock_dict.keys():
+                            current_holding_list.append([stock_code, "B"])
+                f.close()
+
+            if os.path.exists("files/buy/Module_C_" + yesterday + ".csv"):  # 해당 경로에 파일이 있는지 체크한다.
+                f = open("files/buy/Module_C_" + yesterday + ".csv", "r", encoding="utf8")
+                csv_data = csv.reader(f)
+                next(csv_data)  # csv header skip
+                for line in csv_data:  # 줄바꿈된 내용들이 한줄 씩 읽어와진다.
+                    if line != "":
+                        stock_code = line[8]
+                        if stock_code in self.account_stock_dict.keys():
+                            current_holding_list.append([stock_code, "C"])
+                f.close()
+
+        df = pd.DataFrame(current_holding_list, columns=['Code', 'Logic'])
+        df = df.drop_duplicates(subset=None, keep='first', inplace=False, ignore_index=False)
+        df.to_csv('files/hold/holding_list_' + today.strftime("%Y%m%d") + '.csv', index=False)
+
+    def buy_list_process(self):
+        self.logging.logger.debug("매수 후보 추출 프로세스 시작")
+        self.myMsg.send_msg_telegram("매수 후보 추출 프로세스 시작")
+
+        analysis.checkBuySellList.check_buy_sell_list()
+
+        self.logging.logger.debug("매수 후보 추출 프로세스 완료")
+        self.myMsg.send_msg_telegram("매수 후보 추출 프로세스 완료")
+        sys.exit()

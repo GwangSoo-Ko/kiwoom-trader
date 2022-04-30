@@ -21,4 +21,4 @@ class MyMsg():
         bot = telegram.Bot(token)
         test_chat_id = 230299001
         chat_id = -642881208
-        bot.sendMessage(chat_id=test_chat_id, text=msg)
+        bot.sendMessage(chat_id=chat_id, text=msg)
