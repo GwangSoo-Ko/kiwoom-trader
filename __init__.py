@@ -1,8 +1,5 @@
-from datetime import datetime
-
 import exchange_calendars as ecals
 from PyQt5.QtWidgets import *
-from pytz import timezone
 
 from kiwoom.kiwoom import *
 
@@ -23,7 +20,7 @@ class Main:
 
 if __name__ == "__main__":
     XKRX = ecals.get_calendar("XKRX")
-    today = datetime.today().astimezone(timezone('Asia/Seoul'))
+    today = datetime.datetime.today().astimezone(timezone('Asia/Seoul'))
     if XKRX.is_session(today.strftime("%Y-%m-%d")):
         print("Open")
         Main()

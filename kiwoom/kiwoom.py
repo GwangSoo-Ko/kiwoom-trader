@@ -43,7 +43,7 @@ class Kiwoom(QAxWidget):
         self.account_num = None  # 계좌번호 담아줄 변수
         self.deposit = 0  # 예수금
         self.use_money = 0  # 실제 투자에 사용할 금액
-        self.use_money_percent = 0.1  # 예수금에서 실제 사용할 비율
+        self.use_money_percent = 0.2  # 예수금에서 실제 사용할 비율
         self.output_deposit = 0  # 출력가능 금액
         self.total_profit_loss_money = 0  # 총평가손익금액
         self.total_profit_loss_rate = 0.0  # 총수익률(%)
@@ -91,6 +91,7 @@ class Kiwoom(QAxWidget):
 
         message_string = []
         message_string2 = []
+        message_string3 = []
         i = 0
         if len(self.account_stock_dict) == 0:
             message_string.append("[보유 종목 없음]")
@@ -106,12 +107,19 @@ class Kiwoom(QAxWidget):
                 total_buy_price = quantity * buy_price
                 total_current_price = quantity * current_price
                 profit = total_current_price - total_buy_price
-                if i % 2 == 0:
+                if i % 3 == 0:
                     message_string.append("종목명: %s\n보유수량: %d\n매입가: %d\n현재가: %d\n수익률: %f\n매입금액: %d\n평가금액: %d\n수익: %d" % (
                         code_name, quantity, buy_price, current_price, profit_rate, total_buy_price,
                         total_current_price,
                         profit))
                     message_string.append("-------------------------------------")
+                elif i % 3 == 1:
+                    message_string3.append(
+                        "종목명: %s\n보유수량: %d\n매입가: %d\n현재가: %d\n수익률: %f\n매입금액: %d\n평가금액: %d\n수익: %d" % (
+                            code_name, quantity, buy_price, current_price, profit_rate, total_buy_price,
+                            total_current_price,
+                            profit))
+                    message_string3.append("-------------------------------------")
                 else:
                     message_string2.append(
                         "종목명: %s\n보유수량: %d\n매입가: %d\n현재가: %d\n수익률: %f\n매입금액: %d\n평가금액: %d\n수익: %d" % (
@@ -122,6 +130,7 @@ class Kiwoom(QAxWidget):
                 i = i + 1
             self.myMsg.send_msg_telegram('\n'.join(message_string))
             self.myMsg.send_msg_telegram('\n'.join(message_string2))
+            self.myMsg.send_msg_telegram('\n'.join(message_string3))
 
         message_string = []
         if len(self.not_account_stock_dict) == 0:
@@ -203,7 +212,7 @@ class Kiwoom(QAxWidget):
 
     def get_account_info(self):
         account_list = self.dynamicCall("GetLoginInfo(QString)", "ACCNO")  # 계좌번호 반환
-        account_num = account_list.split(';')[0]  # a;b;c  [a, b, c]
+        account_num = account_list.split(';')[1]  # a;b;c  [a, b, c]
 
         self.account_num = account_num
 
@@ -839,6 +848,7 @@ class Kiwoom(QAxWidget):
         self.detail_account_mystock()
         message_string = []
         message_string2 = []
+        message_string3 = []
         i = 0
         if len(self.account_stock_dict) == 0:
             message_string.append("[보유 종목 없음]")
@@ -854,13 +864,20 @@ class Kiwoom(QAxWidget):
                 total_buy_price = quantity * buy_price
                 total_current_price = quantity * current_price
                 profit = total_current_price - total_buy_price
-                if i % 2 == 0:
+                if i % 3 == 0:
                     message_string.append(
                         "종목명: %s\n보유수량: %d\n매입가: %d\n현재가: %d\n수익률: %f\n매입금액: %d\n평가금액: %d\n수익: %d" % (
                             code_name, quantity, buy_price, current_price, profit_rate, total_buy_price,
                             total_current_price,
                             profit))
                     message_string.append("-------------------------------------")
+                elif i % 3 == 1:
+                    message_string3.append(
+                        "종목명: %s\n보유수량: %d\n매입가: %d\n현재가: %d\n수익률: %f\n매입금액: %d\n평가금액: %d\n수익: %d" % (
+                            code_name, quantity, buy_price, current_price, profit_rate, total_buy_price,
+                            total_current_price,
+                            profit))
+                    message_string3.append("-------------------------------------")
                 else:
                     message_string2.append(
                         "종목명: %s\n보유수량: %d\n매입가: %d\n현재가: %d\n수익률: %f\n매입금액: %d\n평가금액: %d\n수익: %d" % (
@@ -871,6 +888,7 @@ class Kiwoom(QAxWidget):
                 i = i + 1
             self.myMsg.send_msg_telegram('\n'.join(message_string))
             self.myMsg.send_msg_telegram('\n'.join(message_string2))
+            self.myMsg.send_msg_telegram('\n'.join(message_string3))
 
         current_holding_list = []
         today = datetime.datetime.today()
